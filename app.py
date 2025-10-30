@@ -132,6 +132,31 @@ def main():
     if submit_button:
         submitted = True
 
+    # Extra always-visible mobile-friendly button (outside the form)
+    # Some mobile keyboards do not expose a submit/enter key for multi-line inputs,
+    # so provide a large tappable button below the form as well.
+    if st.button("Enter (Submit)"):
+        submitted = True
+        # If URL mode, ensure URL is present and (re)fetch article
+        if input_method != "Text":
+            if 'url_input' not in locals() or not url_input:
+                st.error("Please enter a URL before submitting.")
+                submitted = False
+            else:
+                if not st.session_state.scraper.validate_url(url_input):
+                    st.error("Please enter a valid URL")
+                    submitted = False
+                else:
+                    with st.spinner("Fetching article..."):
+                        article = st.session_state.scraper.extract_from_url(url_input)
+                        if not article['success']:
+                            st.error(f"Failed to fetch article: {article['error']}")
+                            submitted = False
+                        else:
+                            text_input = article['text']
+                            if article.get('title'):
+                                st.subheader(f"Article Title: {article['title']}")
+
         # If URL mode, fetch article content
         if input_method != "Text":
             if not url_input:
