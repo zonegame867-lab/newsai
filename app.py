@@ -104,42 +104,52 @@ def main():
     # Enable sentiment analysis
     enable_sentiment = st.sidebar.checkbox("Enable Sentiment Analysis", value=True)
     
-    # Main content area
-    if input_method == "Text":
-        text_input = st.text_area(
-            "Paste your article text here",
-            height=200,
-            max_chars=UI_CONFIG['max_input_length']
-        )
-        
-    else:  # URL input
-        url_input = st.text_input("Enter article URL")
-        
-        if url_input:
-            if not st.session_state.scraper.validate_url(url_input):
-                st.error("Please enter a valid URL")
-                return
-                
-            with st.spinner("Fetching article..."):
-                article = st.session_state.scraper.extract_from_url(url_input)
-                
-                if not article['success']:
-                    st.error(f"Failed to fetch article: {article['error']}")
-                    return
-                    
-                text_input = article['text']
-                if article['title']:
-                    st.subheader(f"Article Title: {article['title']}")
+    # Main content area with explicit submit button
+    text_input = ""
+    submitted = False
+
+    with st.form(key="input_form"):
+        if input_method == "Text":
+            text_input = st.text_area(
+                "Paste your article text here",
+                height=200,
+                max_chars=UI_CONFIG['max_input_length']
+            )
         else:
-            text_input = ""
-    
-    # Process text when available
-    if text_input:
+            url_input = st.text_input("Enter article URL")
+
+        submit_button = st.form_submit_button(label="Summarize")
+
+    if submit_button:
+        submitted = True
+
+        # If URL mode, fetch article content
+        if input_method != "Text":
+            if not url_input:
+                st.error("Please enter a URL before submitting.")
+                submitted = False
+            else:
+                if not st.session_state.scraper.validate_url(url_input):
+                    st.error("Please enter a valid URL")
+                    submitted = False
+                else:
+                    with st.spinner("Fetching article..."):
+                        article = st.session_state.scraper.extract_from_url(url_input)
+                        if not article['success']:
+                            st.error(f"Failed to fetch article: {article['error']}")
+                            submitted = False
+                        else:
+                            text_input = article['text']
+                            if article.get('title'):
+                                st.subheader(f"Article Title: {article['title']}")
+
+    # Process text when user pressed the Summarize button
+    if submitted and text_input:
         with st.spinner("Processing..."):
             # Preprocess text
             clean_text = st.session_state.preprocessor.preprocess(text_input)
             sentences = st.session_state.preprocessor.tokenize_sentences(clean_text)
-            
+
             # Generate summary
             with Timer() as timer:
                 if summary_mode == "Extractive":
@@ -158,69 +168,68 @@ def main():
                         min_length=min_length,
                         temperature=temperature
                     )
-            
+
             if not result['success']:
                 st.error(f"Failed to generate summary: {result['error']}")
-                return
-            
-            # Display results
-            st.header("Summary Results")
-            
-            # Display metrics
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric(
-                    "Original Length",
-                    f"{st.session_state.metrics.word_counts(text_input)} words"
-                )
-            
-            with col2:
-                st.metric(
-                    "Summary Length",
-                    f"{st.session_state.metrics.word_counts(result['summary'])} words"
-                )
-            
-            with col3:
-                compression = st.session_state.metrics.calculate_compression_ratio(
-                    text_input,
-                    result['summary']
-                )
-                st.metric(
-                    "Compression Ratio",
-                    f"{compression:.1f}%"
-                )
-            
-            # Display summary
-            st.subheader("Generated Summary")
-            st.write(result['summary'])
-            
-            # Display processing time
-            st.info(f"Processing time: {timer.duration:.2f} seconds")
-            
-            # Sentiment analysis
-            if enable_sentiment:
-                st.subheader("Sentiment Analysis")
-                
-                with st.spinner("Loading sentiment model..."):
-                    model = load_sentiment_model()
-                sentiment_result = model.analyze(result['summary'])
-                
-                if sentiment_result['success']:
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown(
-                            f"<h3 style='color: {model.get_color(sentiment_result['sentiment'])};'>"
-                            f"{sentiment_result['sentiment']}</h3>",
-                            unsafe_allow_html=True
-                        )
-                    
-                    with col2:
-                        st.progress(sentiment_result['confidence'])
-                        st.text(f"Confidence: {sentiment_result['confidence']:.2%}")
-                else:
-                    st.error(f"Failed to analyze sentiment: {sentiment_result['error']}")
+            else:
+                # Display results
+                st.header("Summary Results")
+
+                # Display metrics
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.metric(
+                        "Original Length",
+                        f"{st.session_state.metrics.word_counts(text_input)} words"
+                    )
+
+                with col2:
+                    st.metric(
+                        "Summary Length",
+                        f"{st.session_state.metrics.word_counts(result['summary'])} words"
+                    )
+
+                with col3:
+                    compression = st.session_state.metrics.calculate_compression_ratio(
+                        text_input,
+                        result['summary']
+                    )
+                    st.metric(
+                        "Compression Ratio",
+                        f"{compression:.1f}%"
+                    )
+
+                # Display summary
+                st.subheader("Generated Summary")
+                st.write(result['summary'])
+
+                # Display processing time
+                st.info(f"Processing time: {timer.duration:.2f} seconds")
+
+                # Sentiment analysis
+                if enable_sentiment:
+                    st.subheader("Sentiment Analysis")
+
+                    with st.spinner("Loading sentiment model..."):
+                        model = load_sentiment_model()
+                    sentiment_result = model.analyze(result['summary'])
+
+                    if sentiment_result['success']:
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.markdown(
+                                f"<h3 style='color: {model.get_color(sentiment_result['sentiment'])};'>"
+                                f"{sentiment_result['sentiment']}</h3>",
+                                unsafe_allow_html=True
+                            )
+
+                        with col2:
+                            st.progress(sentiment_result['confidence'])
+                            st.text(f"Confidence: {sentiment_result['confidence']:.2%}")
+                    else:
+                        st.error(f"Failed to analyze sentiment: {sentiment_result['error']}")
 
 if __name__ == "__main__":
     main()
