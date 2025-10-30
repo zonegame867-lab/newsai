@@ -118,7 +118,16 @@ def main():
         else:
             url_input = st.text_input("Enter article URL")
 
-        submit_button = st.form_submit_button(label="Summarize")
+        # Two buttons: primary 'Enter' for mobile-friendly submission and a 'Clear' button
+        col_a, col_b = st.columns([1, 1])
+        with col_a:
+            submit_button = st.form_submit_button(label="Enter", key="submit")
+        with col_b:
+            clear_button = st.form_submit_button(label="Clear", key="clear")
+
+    if clear_button:
+        # Clear inputs and reset
+        st.experimental_rerun()
 
     if submit_button:
         submitted = True
