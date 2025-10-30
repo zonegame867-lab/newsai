@@ -57,6 +57,23 @@ def main():
     
     # Title
     st.title("📰 ML-Powered News Summarizer")
+    # Make the main external button larger and full-width for mobile users
+    st.markdown(
+        """
+        <style>
+        /* Make Streamlit buttons full-width and larger for better mobile tapping */
+        div.stButton > button {
+            width: 100% !important;
+            height: 56px !important;
+            font-size: 18px !important;
+            border-radius: 8px !important;
+        }
+        /* Center the external button container and add spacing */
+        .external-button-container { max-width: 900px; margin: 12px auto; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     
     # Sidebar
     st.sidebar.title("Settings")
